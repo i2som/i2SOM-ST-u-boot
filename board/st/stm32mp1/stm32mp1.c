@@ -935,6 +935,36 @@ int board_late_init(void)
 		board_check_usb_power();
 	}
 
+	struct gpio_desc gpio, watchdog_wdi;
+	ofnode node;
+
+	node = ofnode_path("/config");
+	if (!ofnode_valid(node)) {
+		log_err("no /config node?\n");
+		return;
+	}
+
+	if (gpio_request_by_name_nodev(node, "watchdog-gpios", 0,
+					       &gpio, GPIOD_IS_OUT)) {
+			log_err("could not find a /config/watchdog-gpios\n");
+		} else {
+			log_err("enable watchdog switch\n");
+			dm_gpio_set_value(&gpio, 0);
+			//dm_gpio_free(NULL, &gpio);
+		}
+
+	if (gpio_request_by_name_nodev(node, "watchdog-wdi-gpios", 0,
+					       &watchdog_wdi, GPIOD_IS_OUT)) {
+			log_err("could not find a /config/watchdog-wdi-gpios\n");
+		} else {
+			log_err("disable watchdog\n");
+			dm_gpio_set_value(&watchdog_wdi, 0);
+			udelay(50);
+			//dm_gpio_set_value(&watchdog_wdi, 1);
+			//udelay(50);
+			//dm_gpio_free(NULL, &watchdog_wdi);
+		}
+
 	return 0;
 }
 
@@ -1377,6 +1407,7 @@ void stm32mp13x_dk_fdt_update(void *new_blob)
 	 */
 	phandle_stmipi_ep = fdt_get_phandle(new_blob, nodeoff_stmipi_ep);
 	fdt_setprop_u32(new_blob, nodeoff_ov5640_ep, "remote-endpoint", phandle_stmipi_ep);
+
 }
 
 void stm32mp15x_dk2_fdt_update(void *new_blob)
