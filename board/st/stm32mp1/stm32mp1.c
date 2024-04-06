@@ -564,7 +564,7 @@ static void sysconf_init(void)
 static int board_stm32mp15x_dk2_init(void)
 {
 	ofnode node;
-	struct gpio_desc hdmi, audio;
+	struct gpio_desc hdmi, audio, eth_rst;
 	int ret = 0;
 
 	/* Fix to make I2C1 usable on DK2 for touchscreen usage in kernel */
@@ -610,6 +610,7 @@ static int board_stm32mp15x_dk2_init(void)
 	/* power-up HDMI IC */
 	regulator_autoset_by_name("v1v2_hdmi", NULL);
 	regulator_autoset_by_name("v3v3_hdmi", NULL);
+
 
 error:
 	return ret;
@@ -883,6 +884,7 @@ int board_late_init(void)
 	char buf[10];
 	char dtb_name[256];
 	int buf_len;
+	struct gpio_desc eth_rst, wifi;
 
 	if (board_is_stm32mp13x_dk())
 		board_stm32mp13x_dk_init();
@@ -965,6 +967,88 @@ int board_late_init(void)
 			//dm_gpio_free(NULL, &watchdog_wdi);
 		}
 
+	node = ofnode_path("/soc/ethernet@5800a000");
+	if (!ofnode_valid(node)) {
+		pr_err("%s: no ethernet ?\n", __func__);
+	}else{
+
+		pr_err("ethernet reset phy\n");
+		if (gpio_request_by_name_nodev(node, "snps,reset-gpio", 0,
+					       &eth_rst, GPIOD_IS_OUT)) {
+			pr_err("%s: could not find ethernet reset-gpios\n",
+				 __func__);
+			return -ENOENT;
+		}
+
+		if(dm_gpio_is_valid(&eth_rst)){
+			ret = dm_gpio_set_value(&eth_rst, 1);
+			if (ret) {
+				pr_err("%s: can't set_value for ethernet reset gpio", __func__);
+				goto error;
+			}
+			mdelay(20);
+
+			ret = dm_gpio_set_value(&eth_rst, 0);
+			if (ret) {
+				pr_err("%s: can't set_value for ethernet reset gpio", __func__);
+				goto error;
+			}
+			mdelay(10);
+
+			ret = dm_gpio_set_value(&eth_rst, 1);
+			if (ret) {
+				pr_err("%s: can't set_value for ethernet reset gpio", __func__);
+				goto error;
+			}
+			mdelay(50);
+		}
+	}
+
+	node = ofnode_path("/wifi-module");
+	if (!ofnode_valid(node)) {
+		pr_err("%s: no wifi-module node ?\n", __func__);
+	}else{
+
+		if (gpio_request_by_name_nodev(node, "power-gpios", 0,
+					       &wifi, GPIOD_IS_OUT)) {
+			pr_err("%s: could not find wifi-module reset-gpios\n",
+				 __func__);
+			//return -ENOENT;
+		}else if(dm_gpio_is_valid(&wifi)){
+			ret = dm_gpio_set_value(&wifi, 1);
+			if (ret) {
+				pr_err("%s: can't set_value for ethernet reset gpio", __func__);
+				goto error;
+			}
+		}
+
+		if (gpio_request_by_name_nodev(node, "wifi-reg-gpios", 0,
+					       &wifi, GPIOD_IS_OUT)) {
+			pr_err("%s: could not find wifi-module wifi-reg-gpios\n",
+				 __func__);
+			//return -ENOENT;
+		}else if(dm_gpio_is_valid(&wifi)){
+			ret = dm_gpio_set_value(&wifi, 1);
+			if (ret) {
+				pr_err("%s: can't set_value for ethernet reset gpio", __func__);
+				goto error;
+			}
+		}
+
+		if (gpio_request_by_name_nodev(node, "bt-reg-gpios", 0,
+					       &wifi, GPIOD_IS_OUT)) {
+			pr_err("%s: could not find wifi-module bt-reg-gpios\n",
+				 __func__);
+			//return -ENOENT;
+		}else if(dm_gpio_is_valid(&wifi)){
+			ret = dm_gpio_set_value(&wifi, 1);
+			if (ret) {
+				pr_err("%s: can't set_value for ethernet reset gpio", __func__);
+				goto error;
+			}
+		}
+	}
+error:
 	return 0;
 }
 
