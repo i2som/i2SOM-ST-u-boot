@@ -972,7 +972,6 @@ int board_late_init(void)
 		pr_err("%s: no ethernet ?\n", __func__);
 	}else{
 
-		pr_err("ethernet reset phy\n");
 		if (gpio_request_by_name_nodev(node, "snps,reset-gpio", 0,
 					       &eth_rst, GPIOD_IS_OUT)) {
 			pr_err("%s: could not find ethernet reset-gpios\n",
@@ -981,19 +980,20 @@ int board_late_init(void)
 		}
 
 		if(dm_gpio_is_valid(&eth_rst)){
+			pr_err("ethernet reset phy\n");
 			ret = dm_gpio_set_value(&eth_rst, 1);
 			if (ret) {
 				pr_err("%s: can't set_value for ethernet reset gpio", __func__);
 				goto error;
 			}
-			mdelay(20);
+			mdelay(50);
 
 			ret = dm_gpio_set_value(&eth_rst, 0);
 			if (ret) {
 				pr_err("%s: can't set_value for ethernet reset gpio", __func__);
 				goto error;
 			}
-			mdelay(10);
+			mdelay(20);
 
 			ret = dm_gpio_set_value(&eth_rst, 1);
 			if (ret) {
