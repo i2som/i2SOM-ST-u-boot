@@ -874,6 +874,7 @@ int board_init(void)
 	return 0;
 }
 
+
 int board_late_init(void)
 {
 	const void *fdt_compat;
@@ -885,6 +886,8 @@ int board_late_init(void)
 	char dtb_name[256];
 	int buf_len;
 	struct gpio_desc eth_rst, wifi;
+	struct gpio_desc watchdog_en, watchdog_wdi;
+	ofnode node;
 
 	if (board_is_stm32mp13x_dk())
 		board_stm32mp13x_dk_init();
@@ -937,8 +940,6 @@ int board_late_init(void)
 		board_check_usb_power();
 	}
 
-	struct gpio_desc gpio, watchdog_wdi;
-	ofnode node;
 
 	node = ofnode_path("/config");
 	if (!ofnode_valid(node)) {
@@ -947,24 +948,22 @@ int board_late_init(void)
 	}
 
 	if (gpio_request_by_name_nodev(node, "watchdog-gpios", 0,
-					       &gpio, GPIOD_IS_OUT)) {
-			log_err("could not find a /config/watchdog-gpios\n");
+					       &watchdog_en, GPIOD_IS_OUT)) {
+			log_warning("could not find a /config/watchdog-gpios\n");
 		} else {
-			log_err("enable watchdog switch\n");
-			dm_gpio_set_value(&gpio, 0);
+			log_warning("enable gpio watchdog\n");
+			dm_gpio_set_value(&watchdog_en, 0);
 			//dm_gpio_free(NULL, &gpio);
 		}
 
 	if (gpio_request_by_name_nodev(node, "watchdog-wdi-gpios", 0,
 					       &watchdog_wdi, GPIOD_IS_OUT)) {
-			log_err("could not find a /config/watchdog-wdi-gpios\n");
+			log_warning("could not find a /config/watchdog-wdi-gpios\n");
 		} else {
-			log_err("disable watchdog\n");
+			log_warning("feed gpio watchdog\n");
 			dm_gpio_set_value(&watchdog_wdi, 0);
-			udelay(50);
-			//dm_gpio_set_value(&watchdog_wdi, 1);
-			//udelay(50);
-			//dm_gpio_free(NULL, &watchdog_wdi);
+			udelay(5);
+			dm_gpio_set_value(&watchdog_wdi, 1);
 		}
 
 	node = ofnode_path("/soc/ethernet@5800a000");
