@@ -849,6 +849,9 @@ int board_init(void)
 	struct udevice *dev;
 	int ret;
 
+	hw_watchdog_init();
+	hw_watchdog_reset();
+
 	/* probe RCC to avoid circular access with usbphyc probe as clk provider */
 	if (IS_ENABLED(CONFIG_CLK_STM32MP13)) {
 		ret = uclass_get_device_by_driver(UCLASS_CLK, DM_DRIVER_GET(stm32mp1_clock), &dev);
@@ -874,6 +877,55 @@ int board_init(void)
 	return 0;
 }
 
+// #ifdef CONFIG_HW_WATCHDOG
+
+static struct gpio_desc watchdog_en, watchdog_wdi;
+static bool hw_watchdog_init_done = false;
+
+void hw_watchdog_init(void)
+{
+	ofnode node;
+	struct udevice *dev;
+
+
+	if (hw_watchdog_init_done)
+		return;
+
+	node = ofnode_path("/config");
+	if (!ofnode_valid(node)) {
+		log_err("no /config node?\n");
+		return;
+	}
+
+	if (gpio_request_by_name_nodev(node, "watchdog-gpios", 0,
+				       &watchdog_en, GPIOD_IS_OUT)) {
+		log_warning("could not find a /config/watchdog-gpios\n");
+	} else {
+		dm_gpio_set_value(&watchdog_en, 0);
+	}
+
+    if (gpio_request_by_name_nodev(node, "watchdog-wdi-gpios", 0,
+						&watchdog_wdi, GPIOD_IS_OUT)) {
+		log_warning("could not find a /config/watchdog-wdi-gpios\n");
+    } else {
+			dm_gpio_set_value(&watchdog_wdi, 0);
+    }
+	hw_watchdog_init_done = true;
+
+	hw_watchdog_reset();
+}
+
+void hw_watchdog_reset(void)
+{
+	if (!hw_watchdog_init_done)
+		return;
+
+	dm_gpio_set_value(&watchdog_wdi, 0);
+	udelay(5);
+	dm_gpio_set_value(&watchdog_wdi, 1);
+}
+
+// #endif
 
 int board_late_init(void)
 {
@@ -946,25 +998,6 @@ int board_late_init(void)
 		log_err("no /config node?\n");
 		return;
 	}
-
-	if (gpio_request_by_name_nodev(node, "watchdog-gpios", 0,
-					       &watchdog_en, GPIOD_IS_OUT)) {
-			log_warning("could not find a /config/watchdog-gpios\n");
-		} else {
-			log_warning("enable gpio watchdog\n");
-			dm_gpio_set_value(&watchdog_en, 0);
-			//dm_gpio_free(NULL, &gpio);
-		}
-
-	if (gpio_request_by_name_nodev(node, "watchdog-wdi-gpios", 0,
-					       &watchdog_wdi, GPIOD_IS_OUT)) {
-			log_warning("could not find a /config/watchdog-wdi-gpios\n");
-		} else {
-			log_warning("feed gpio watchdog\n");
-			dm_gpio_set_value(&watchdog_wdi, 0);
-			udelay(5);
-			dm_gpio_set_value(&watchdog_wdi, 1);
-		}
 
 	node = ofnode_path("/soc/ethernet@5800a000");
 	if (!ofnode_valid(node)) {
